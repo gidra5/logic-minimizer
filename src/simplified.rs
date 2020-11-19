@@ -13,10 +13,10 @@ pub fn simplify(implicants: Vec<( Implicant, Vec<String> )>) -> Vec<( Implicant,
 
       let intersect: Vec<String> = item_i.1.iter()
         .zip(item_j.1.iter())
-        .map(|(a, b)| a == "1" && b == "1")
+        .map(|(x, y)| (x.as_str(), y.as_str()))
         .map(|x| match x {
-          true =>  String::from("1"),
-          false => String::from("0")
+          ("-", "1") | ("1", "-") | ("1", "1") => String::from("1"),
+          _ => String::from("0")
         })
         .collect();
 
