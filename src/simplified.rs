@@ -36,9 +36,15 @@ pub fn simplify(implicants: Vec<( Implicant, Vec<String> )>) -> Vec<( Implicant,
   
           let implicant = Implicant { terms: simpler };
           
-          //TODO set to "0" elements that are "1" in 'intersect'
-          // simplified_implicants[i] = true;
-          // simplified_implicants[j] = true;
+          let transformed = intersect
+            .iter()
+            .enumerate()
+            .filter(|(_i, x)| **x != String::from("0"))
+            .map(|(i, _x)| i);
+          for k in transformed {
+            simplified_implicants[i][k] = String::from("0");
+            simplified_implicants[j][k] = String::from("0");
+          };
 
           simplified.push(( implicant, intersect ));
         };
@@ -46,19 +52,17 @@ pub fn simplify(implicants: Vec<( Implicant, Vec<String> )>) -> Vec<( Implicant,
     };
   };
 
-  //for now to debug
-  // if simplified.len() > 0 {
-  //   simplified = simplify(simplified);
-  // }
+  if simplified.len() > 0 {
+    simplified = simplify(simplified);
+  }
 
   let mut tmp: Vec<( Implicant, Vec<String> )> = implicants.into_iter()
     .enumerate()
-    .filter(|(i, _)| simplified_implicants[*i].iter().fold(true, |acc, x| acc || x == "1"))
-    .map(|(_, x)| x)
+    .filter(|(i, _)| simplified_implicants[*i].contains(&String::from("1")))
+    .map(|(i, (x, y))| (x, simplified_implicants[i].clone()))
     .collect();
 
   tmp.append(&mut simplified);
   tmp
 }
-
 

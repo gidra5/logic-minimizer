@@ -21,6 +21,10 @@ struct LogicalFunction {
 fn main() {
     let implicants: Vec<(Implicant, Vec<String>)> = {
         let args: Vec<String> = env::args().collect();
+        if let 1 = args.len() {
+            println!("\x1b[31mPls select file\x1b[0m");
+            panic!("Not enough arguments");
+        };
         let file = &args[1];
 
         fs::read_to_string(&file)
