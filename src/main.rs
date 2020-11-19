@@ -111,7 +111,24 @@ fn main() {
     // }
 
     println!("Simplified:");
-    for i in &simplified {
-        println!("{:?}", i);
+    for (implicant, functions) in &simplified {
+        let res: Vec<String> = implicant
+            .terms
+            .iter()
+            .map(|x| {
+                match x {
+                    Some(false) => String::from("0"),
+                    Some(true) => String::from("1"),
+                    None => String::from("-")
+                }
+            })
+            .collect();
+        let indexes: Vec<usize> = functions
+            .iter()
+            .enumerate()
+            .filter(|(_i, x)| **x == String::from("1"))
+            .map(|(i, x)| i)
+            .collect();
+        println!("Result: {:?} Functions: {:?}", res, indexes);
     }
 }
