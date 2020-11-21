@@ -13,28 +13,31 @@ impl PartialEq for Implicant {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct LogicalFunction {
     implicants: Vec<Implicant>,
 }
 
 fn main() {
-    let implicants: Vec<(Implicant, Vec<String>)> = {
-        let args: Vec<String> = env::args().collect();
-        if let 1 = args.len() {
-            println!("\x1b[31mPls select file\x1b[0m");
-            panic!("Not enough arguments");
+    let implicants: Vec<_> = {
+        let file = match env::args().collect::<Vec<_>>().as_slice() {
+            [] | [_] => {
+                println!("\x1b[31mPls select file\x1b[0m");
+                panic!("Not enough arguments");
+            },
+            [_, filename, ..] => filename.clone()
         };
-        let file = &args[1];
 
         fs::read_to_string(&file)
             .unwrap()
-            .split("\r\n")
-            .filter(|x| *x != "")
+            .lines()
             .map(|x| {
-                let collected: Vec<&str> = x.split('~').collect();
+                let (left, right) = match x.split('~').collect::<Vec<_>>().as_slice() {
+                    [] | [_] => panic!("not enough data in row"),
+                    [left, right, ..] => (*left, *right)
+                };
 
-                let c1: Vec<Option<bool>> = collected[0]
+                let terms: Vec<_> = left
                     .split("")
                     .filter(|x| *x != "")
                     .map(|x| match x {
@@ -44,91 +47,101 @@ fn main() {
                     })
                     .collect();
 
-                let c2: Vec<String> = collected[1]
+                let functions: Vec<_> = right
                     .split("")
                     .filter(|x| *x != "")
                     .map(|x| String::from(x))
                     .collect();
 
-                (Implicant { terms: c1 }, c2)
+                (Implicant { terms }, functions)
             })
             .collect()
     };
 
     println!("Initial:");
-    for i in &implicants {
-        println!("{:?}", i);
+    for (i, x) in implicants.iter().enumerate() {
+        println!("{}, {:?}", i, x);
     }
-
     println!("");
 
-    let simplified: Vec<(Implicant, Vec<String>)> = simplify(implicants);
-
-    // for i in 0..implicants.len() {
-    //     let item_i = &implicants[i];
-    //     let mut found = false;
-
-    //     for j in i + 1..implicants.len() {
-    //         let item_j = &implicants[j];
-    //         let compared: Vec<bool> = item_i
-    //             .1
-    //             .iter()
-    //             .zip(item_j.1.iter())
-    //             .map(|(a, b)| a == "1" && b == "1")
-    //             .collect();
-
-    //         if compared.contains(&true) {
-    //             let pairs = item_i.0.terms.iter().zip(item_j.0.terms.iter());
-    //             let mut counter = vec![];
-
-    //             for (i, (a, b)) in pairs.enumerate() {
-    //                 if a != b {
-    //                     counter.push(i);
-    //                 }
-    //             }
-
-    //             if counter.len() == 1 {
-    //                 let mut simpler = item_i.0.terms.clone();
-    //                 let index = counter[0];
-    //                 simpler[index] = None;
-    //                 let implicant = Implicant { terms: simpler };
-    //                 let intersect = compared
-    //                     .iter()
-    //                     .map(|x| match x {
-    //                         true => String::from("1"),
-    //                         false => String::from("0"),
-    //                     })
-    //                     .collect();
-    //                 found = true;
-    //                 simplified.push((implicant, intersect));
-    //             };
-    //         };
-    //     }
-
-    //     if !found {
-    //         simplified.push(item_i.clone());
-    //     };
-    // }
+    let simplified: Vec<_> = simplify(implicants);
 
     println!("Simplified:");
-    for (implicant, functions) in &simplified {
-        let res: Vec<String> = implicant
+    for (i, x) in simplified.iter().enumerate() {
+        println!("{}, {:?}", i, x);
+    }
+    println!("");
+
+    for (i, (implicant, functions)) in simplified.iter().enumerate() {
+        let res: Vec<_> = implicant
             .terms
             .iter()
-            .map(|x| {
+            .enumerate()
+            .map(|(i, x)| {
                 match x {
-                    Some(false) => String::from("0"),
-                    Some(true) => String::from("1"),
-                    None => String::from("-")
+                    Some(false) => format!("!x{}", i),
+                    Some(true) => format!(" x{}", i),
+                    None => String::from(" - ")
                 }
             })
             .collect();
-        let indexes: Vec<usize> = functions
+
+        let indexes: Vec<_> = functions
             .iter()
             .enumerate()
-            .filter(|(_i, x)| **x == String::from("1"))
-            .map(|(i, x)| i)
+            .filter(|(_, x)| **x == "1")
+            .map(|(i, _)| i)
             .collect();
-        println!("Result: {:?} Functions: {:?}", res, indexes);
+
+        println!("{}-th Result: {} Functions: {:?}", i, res.join(" "), indexes);
+    }
+
+    let functions: Vec<LogicalFunction> = {
+        let mut fns: Vec<LogicalFunction> = vec![];
+
+        for (implicant, functions) in &simplified {
+            let indexes = functions
+                .iter()
+                .enumerate()
+                .filter(|(_, x)| **x == "1")
+                .map(|(i, _)| i);
+
+            for i in indexes {
+                if fns.len() <= i {
+                    fns.resize(i + 1, LogicalFunction { implicants: vec![] });
+                }
+
+                fns[i].implicants.push(implicant.clone());
+            }
+        }
+
+        fns
+    };
+
+    for (i, LogicalFunction { implicants }) in functions.iter().enumerate() {
+        let mut func: Vec<String> = vec![];
+
+        for Implicant { terms } in implicants {
+            let implicant = terms
+            .iter()
+            .enumerate()
+            .filter(|(_, x)| match x {
+                Some(_) => true,
+                None => false
+            })
+            .map(|(i, x)| {
+                match x {
+                    Some(false) => format!("!x{}", i),
+                    Some(true) => format!(" x{}", i),
+                    None => String::from("")
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" & ");
+
+            func.push( format!("({})", implicant) );
+        }
+
+        println!("y{} = {}", i, func.join(" | "));
     }
 }

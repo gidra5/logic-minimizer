@@ -1,3 +1,4 @@
+// #![feature(non_ascii_idents)]
 pub use crate::Implicant;
 
 pub fn simplify(implicants: Vec<( Implicant, Vec<String> )>) -> Vec<( Implicant, Vec<String> )> {
@@ -21,7 +22,6 @@ pub fn simplify(implicants: Vec<( Implicant, Vec<String> )>) -> Vec<( Implicant,
         .collect();
 
       if intersect.contains(&String::from("1")) {
-
         let different_at: Vec<usize> = item_i.0.terms.iter()
           .zip(item_j.0.terms.iter())
           .enumerate()
@@ -59,8 +59,25 @@ pub fn simplify(implicants: Vec<( Implicant, Vec<String> )>) -> Vec<( Implicant,
   let mut tmp: Vec<( Implicant, Vec<String> )> = implicants.into_iter()
     .enumerate()
     .filter(|(i, _)| simplified_implicants[*i].contains(&String::from("1")))
-    .map(|(i, (x, y))| (x, simplified_implicants[i].clone()))
+    .map(|(i, (x, _))| (x, simplified_implicants[i].clone()))
     .collect();
+
+  // let κ: Vec<Vec<usize>> = tmp.iter()
+  //   .filter(|(x, _)| !x.terms.contains(&Some(true)) && !x.terms.contains(&Some(false)))
+  //   .map(|(_, y)| y.iter()
+  //     .enumerate()
+  //     .filter(|(_i, x)| **x != String::from("0"))
+  //     .map(|(i, _x)| i)
+  //     .collect()
+  //   ).collect();
+
+  // for Ω in κ {
+  //   for λ in Ω {
+  //     for i in simplified_implicants {
+  //       i[λ] = String::from("0");
+  //     }
+  //   }
+  // }
 
   tmp.append(&mut simplified);
   tmp
