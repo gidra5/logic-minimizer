@@ -1,10 +1,12 @@
 // #![feature(non_ascii_idents)]
 pub use crate::Implicant;
 
-pub fn simplify(implicants: Vec<( Implicant, Vec<String> )>) -> Vec<( Implicant, Vec<String> )> {
-  let mut simplified_implicants: Vec<Vec<String>> = 
-    implicants.iter().map(|(_, vec)| vec.clone()).collect();
-  let mut simplified: Vec<( Implicant, Vec<String> )> = vec![];
+pub fn simplify(implicants: Vec<( Implicant, Vec<Option<bool>> )>) -> Vec<( Implicant, Vec<Option<bool>> )> {
+  let mut simplified_functions: Vec<_> = implicants.iter()
+      .map(|(_, vec)| vec.clone())
+      .collect();
+
+  let mut simplified: Vec<( Implicant, Vec<Option<bool>> )> = vec![];
 
   for i in 0..implicants.len() {
     let item_i = &implicants[i];
@@ -12,72 +14,53 @@ pub fn simplify(implicants: Vec<( Implicant, Vec<String> )>) -> Vec<( Implicant,
     for j in i + 1..implicants.len() {
       let item_j = &implicants[j];
 
-      let intersect: Vec<String> = item_i.1.iter()
+      let intersect: Vec<_> = item_i.1.iter()
         .zip(item_j.1.iter())
-        .map(|(x, y)| (x.as_str(), y.as_str()))
         .map(|x| match x {
-          ("-", "1") | ("1", "-") | ("1", "1") => String::from("1"),
-          _ => String::from("0")
+          (_, Some(false)) | (Some(false), _) => Some(false),
+          _ => Some(true)
         })
         .collect();
 
-      if intersect.contains(&String::from("1")) {
-        let different_at: Vec<usize> = item_i.0.terms.iter()
-          .zip(item_j.0.terms.iter())
+      let different_at: Vec<usize> = item_i.0.terms.iter()
+        .zip(item_j.0.terms.iter())
+        .enumerate()
+        .filter(|(_, (a, b))| a != b )
+        .map(|(i, _)| i)
+        .collect();
+      
+      if different_at.len() == 1 && intersect.contains(&Some(true)) {
+        println!("{}, {}, {:?}", i, j, intersect);
+        let mut simpler = item_i.0.terms.clone();
+        simpler[different_at[0]] = None;
+
+        let implicant = Implicant { terms: simpler };
+        
+        let transformed = intersect
+          .iter()
           .enumerate()
-          .filter(|(_, (a, b))| a != b )
-          .map(|(i, _)| i)
-          .collect();
+          .filter(|(_i, &x)| x != Some(false))
+          .map(|(i, _x)| i);
 
-        if different_at.len() == 1 { 
-          println!("{}, {}, {:?}", i, j, intersect);
-          let mut simpler = item_i.0.terms.clone();
-          simpler[different_at[0]] = None;
-  
-          let implicant = Implicant { terms: simpler };
-          
-          let transformed = intersect
-            .iter()
-            .enumerate()
-            .filter(|(_i, x)| **x != String::from("0"))
-            .map(|(i, _x)| i);
-          for k in transformed {
-            simplified_implicants[i][k] = String::from("0");
-            simplified_implicants[j][k] = String::from("0");
-          };
-
-          simplified.push(( implicant, intersect ));
+        for k in transformed {
+          simplified_functions[i][k] = Some(false);
+          simplified_functions[j][k] = Some(false);
         };
-      };
-    };
-  };
+
+        simplified.push(( implicant, intersect ));
+      }
+    }
+  }
 
   if simplified.len() > 0 {
     simplified = simplify(simplified);
   }
 
-  let mut tmp: Vec<( Implicant, Vec<String> )> = implicants.into_iter()
+  let mut tmp: Vec<_> = implicants.into_iter()
     .enumerate()
-    .filter(|(i, _)| simplified_implicants[*i].contains(&String::from("1")))
-    .map(|(i, (x, _))| (x, simplified_implicants[i].clone()))
+    .filter(|&(i, _)| simplified_functions[i].contains(&Some(true)))
+    .map(|(i, (x, _))| (x, simplified_functions[i].clone()))
     .collect();
-
-  // let κ: Vec<Vec<usize>> = tmp.iter()
-  //   .filter(|(x, _)| !x.terms.contains(&Some(true)) && !x.terms.contains(&Some(false)))
-  //   .map(|(_, y)| y.iter()
-  //     .enumerate()
-  //     .filter(|(_i, x)| **x != String::from("0"))
-  //     .map(|(i, _x)| i)
-  //     .collect()
-  //   ).collect();
-
-  // for Ω in κ {
-  //   for λ in Ω {
-  //     for i in simplified_implicants {
-  //       i[λ] = String::from("0");
-  //     }
-  //   }
-  // }
 
   tmp.append(&mut simplified);
   tmp

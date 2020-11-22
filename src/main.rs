@@ -7,6 +7,17 @@ pub struct Implicant {
     terms: Vec<Option<bool>>,
 }
 
+impl Implicant {
+    fn new(n: usize) -> Implicant {
+        let mut terms = vec![];
+        terms.resize(n, None);
+
+        Implicant {
+            terms
+        }
+    }
+}
+
 impl PartialEq for Implicant {
     fn eq(&self, other: &Self) -> bool {
         self.terms == other.terms
@@ -50,7 +61,11 @@ fn main() {
                 let functions: Vec<_> = right
                     .split("")
                     .filter(|x| *x != "")
-                    .map(|x| String::from(x))
+                    .map(|x| match x {
+                        "0" => Some(false),
+                        "1" => Some(true),
+                        _ => None
+                    })
                     .collect();
 
                 (Implicant { terms }, functions)
@@ -89,7 +104,8 @@ fn main() {
         let indexes: Vec<_> = functions
             .iter()
             .enumerate()
-            .filter(|(_, x)| **x == "1")
+            // .filter(|(_, x)| **x == "1")
+            .filter(|(_, &x)| x == Some(true))
             .map(|(i, _)| i)
             .collect();
 
@@ -103,7 +119,8 @@ fn main() {
             let indexes = functions
                 .iter()
                 .enumerate()
-                .filter(|(_, x)| **x == "1")
+                // .filter(|(_, x)| **x == "1")
+                .filter(|(_, &x)| x == Some(true))
                 .map(|(i, _)| i);
 
             for i in indexes {
