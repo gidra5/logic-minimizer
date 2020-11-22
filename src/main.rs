@@ -8,9 +8,9 @@ pub struct Implicant {
 }
 
 impl Implicant {
-    fn new(n: usize) -> Implicant {
+    fn new(n: usize, val: Option<bool>) -> Implicant {
         let mut terms = vec![];
-        terms.resize(n, None);
+        terms.resize(n, val);
 
         Implicant {
             terms
@@ -75,7 +75,7 @@ fn main() {
 
     println!("Initial:");
     for (i, x) in implicants.iter().enumerate() {
-        println!("{}, {:?}", i, x);
+        println!("{}, {:?}", i + 1, x);
     }
     println!("");
 
@@ -83,7 +83,7 @@ fn main() {
 
     println!("Simplified:");
     for (i, x) in simplified.iter().enumerate() {
-        println!("{}, {:?}", i, x);
+        println!("{}, {:?}", i + 1, x);
     }
     println!("");
 
@@ -94,8 +94,8 @@ fn main() {
             .enumerate()
             .map(|(i, x)| {
                 match x {
-                    Some(false) => format!("!x{}", i),
-                    Some(true) => format!(" x{}", i),
+                    Some(false) => format!("!x{}", i + 1),
+                    Some(true) => format!(" x{}", i + 1),
                     None => String::from(" - ")
                 }
             })
@@ -106,10 +106,10 @@ fn main() {
             .enumerate()
             // .filter(|(_, x)| **x == "1")
             .filter(|(_, &x)| x == Some(true))
-            .map(|(i, _)| i)
+            .map(|(i, _)| i + 1)
             .collect();
 
-        println!("{}-th Result: {} Functions: {:?}", i, res.join(" "), indexes);
+        println!("{}-th Result: {} Functions: {:?}", i + 1, res.join(" "), indexes);
     }
 
     let functions: Vec<LogicalFunction> = {
@@ -148,8 +148,8 @@ fn main() {
             })
             .map(|(i, x)| {
                 match x {
-                    Some(false) => format!("!x{}", i),
-                    Some(true) => format!(" x{}", i),
+                    Some(false) => format!("!x{}", i + 1),
+                    Some(true) => format!(" x{}", i + 1),
                     None => String::from("")
                 }
             })
@@ -159,6 +159,6 @@ fn main() {
             func.push( format!("({})", implicant) );
         }
 
-        println!("y{} = {}", i, func.join(" | "));
+        println!("y{} = {}", i + 1, func.join(" | "));
     }
 }

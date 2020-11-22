@@ -30,7 +30,7 @@ pub fn simplify(implicants: Vec<( Implicant, Vec<Option<bool>> )>) -> Vec<( Impl
         .collect();
       
       if different_at.len() == 1 && intersect.contains(&Some(true)) {
-        println!("{}, {}, {:?}", i, j, intersect);
+        println!("{}, {}, {:?}", i + 1, j + 1, intersect);
         let mut simpler = item_i.0.terms.clone();
         simpler[different_at[0]] = None;
 
@@ -55,6 +55,78 @@ pub fn simplify(implicants: Vec<( Implicant, Vec<Option<bool>> )>) -> Vec<( Impl
   if simplified.len() > 0 {
     simplified = simplify(simplified);
   }
+
+  let mut table: Vec<Vec<Vec<Implicant>>> = Vec::with_capacity(implicants[0].1.len());
+  table.resize(implicants[0].1.len(), vec![]);
+
+  for i in table.iter_mut() {
+    *i = Vec::with_capacity(implicants.len());
+    i.resize(implicants.len(), vec![]);
+    for j in i.iter_mut() {
+      *j = vec![];
+    }
+  }
+
+  //table[func_index][implicant_index].push(simplified_implicant);
+
+  for (creativnij_index, i) in implicants.iter().enumerate() {
+    for j in simplified.iter() {
+      let zipped: Vec<_> = i.0.terms.iter().zip(j.0.terms.iter())
+        .map(|(a, b)| a == b || (*b == None && *a != None))
+        .collect();
+
+      let intersect = i.1.iter()
+        .zip(j.1.iter())
+        .enumerate()
+        .filter(|(i, x)| match x {
+            (Some(true), Some(true)) => true,
+            _ => false
+        })
+        .map(|(i, _x)| i);
+
+      if !zipped.contains(&false) { 
+        for k in intersect {
+          table[k][creativnij_index].push(j.0.clone());
+        };
+      };
+    };
+  };
+
+  let mut functions = vec![]; 
+  for i in &table {
+    let mut function = vec![];
+    let (mut unsorted_core, mut other_simples): (Vec<_>, Vec<_>) = i
+      .iter()
+      .partition(|&j| j.len() == 1); 
+    let mut core: Vec<_> = unsorted_core.iter()
+      .map(|x| x[0].clone())
+      .collect();
+    let mut others: Vec<_> = vec![];
+    for j in other_simples {
+      let mut shortest = None;
+      let mut count = 0;
+      for k in j {
+        if core.contains(k) { shortest = Some(k.clone()); break; };
+        let quantity = k.terms
+          .iter()
+          .filter(|x| **x == None)
+          .collect::<Vec<_>>().len();
+        if quantity > count { count = quantity; shortest = Some(k.clone()); };
+      }
+      others.push(shortest);
+    }
+    function.append(&mut core);
+    function.append(&mut others.iter().filter(|x| **x != None).map(|x| x.clone().unwrap()).collect());
+    functions.push(function);
+  };
+
+  println!("RES:");
+  for (creativnij_index, i) in functions.iter().enumerate() {
+    println!("{:?}", creativnij_index);
+    for k in i {
+      println!("{:?}", k);
+    }
+  };
 
   let mut tmp: Vec<_> = implicants.into_iter()
     .enumerate()
