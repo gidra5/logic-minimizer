@@ -39,15 +39,8 @@ impl Display for Implicant {
         }
 
         write!(format, "{}", implicant)
-        // todo!()
     }
 }
-
-// impl PartialOrd for Implicant {
-//     fn partial_cmp(&self, other: &Implicant) {
-
-//     }
-// }
 
 #[derive(Debug, Clone)]
 pub struct LogicalFunction {
@@ -118,7 +111,6 @@ fn main() {
                 _ => unreachable!()
             }).collect();
 
-        println!("{:?}", sad);
         let imp = Implicant { terms };
         let covered = initial.iter()
             .map(|x| x.terms.iter()
@@ -139,8 +131,6 @@ fn main() {
     }
 
     implicants.append(&mut generated.iter().map(|x| (x.clone(), tmp.clone())).collect::<Vec<_>>());
-    
-    // println!("{}, {:?}", generated.len(), generated);
 
     let asd = implicants.clone();
     let it = asd
@@ -190,13 +180,7 @@ fn main() {
     println!("");
 
     let simplified: Vec<_> = simplify(&implicants);
-    let fns = construct_func(&implicants, &simplified);
-
-    // println!("Simplified:");
-    // for (i, x) in simplified.iter().enumerate() {
-    //     println!("{}, {:?}", i + 1, x);
-    // }
-    // println!("");
+    let fns = construct_func(&implicants, simplified);
 
     for (i, LogicalFunction { implicants }) in fns.iter().enumerate() {
         let mut func: Vec<String> = vec![];

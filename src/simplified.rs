@@ -1,25 +1,6 @@
 // #![feature(non_ascii_idents)]
 pub use crate::*;
 
-fn partition_implicants(implicants: &Vec<( Implicant, Vec<Option<bool>> )>, n: Option<usize>) 
-  -> Vec<Vec<( Implicant, Vec<Option<bool>> )>>
-{
-  let k = match n {Some(x) => x, _ => implicants[0].0.terms.len() };
-  if k == 0 { return vec![]; }
-
-  let (left, right): (Vec<_>, Vec<_>) = implicants.iter()
-    .partition(|x| x.0.terms
-      .iter()
-      .filter(|&&x| x == None)
-      .collect::<Vec<_>>()
-      .len() >= k - 1);
-
-  let mut t = vec![left.iter().map(|&x| x.clone()).collect::<Vec<_>>()];
-
-  t.append(&mut partition_implicants(&right.iter().map(|&x| x.clone()).collect::<Vec<_>>(), Some(k - 1)));
-  t
-}
-
 pub fn simplify(implicants: &Vec<( Implicant, Vec<Option<bool>> )>) -> Vec<( Implicant, Vec<Option<bool>> )> {
   let mut simplified_functions: Vec<_> = implicants.iter()
       .map(|(_, vec)| vec.clone())
@@ -33,13 +14,12 @@ pub fn simplify(implicants: &Vec<( Implicant, Vec<Option<bool>> )>) -> Vec<( Imp
     for j in i + 1..implicants.len() {
       let item_j = &implicants[j];
 
-      let intersect: Vec<_> = item_i.1.iter()
+      let intersect = item_i.1.iter()
         .zip(item_j.1.iter())
         .map(|x| match x {
-          (_, Some(false)) | (Some(false), _) => Some(false),
-          _ => Some(true)
-        })
-        .collect();
+          (_, Some(false)) | (Some(false), _) => false,
+          _ => true
+        });
 
       let different_at: Vec<usize> = item_i.0.terms.iter()
         .zip(item_j.0.terms.iter())
@@ -48,17 +28,15 @@ pub fn simplify(implicants: &Vec<( Implicant, Vec<Option<bool>> )>) -> Vec<( Imp
         .map(|(i, _)| i)
         .collect();
       
-      if different_at.len() == 1 && intersect.contains(&Some(true)) {
-        // println!("{}, {}, {:?}", i + 1, j + 1, intersect);
+      if different_at.len() == 1 && intersect.clone().any(|x| x) {
         let mut simpler = item_i.0.terms.clone();
         simpler[different_at[0]] = None;
 
         let implicant = Implicant { terms: simpler };
         
-        let transformed = intersect
-          .iter()
+        let transformed = intersect.clone()
           .enumerate()
-          .filter(|(_i, &x)| x != Some(false))
+          .filter(|(_i, x)| *x)
           .map(|(i, _x)| i);
 
         for k in transformed {
@@ -66,7 +44,7 @@ pub fn simplify(implicants: &Vec<( Implicant, Vec<Option<bool>> )>) -> Vec<( Imp
           simplified_functions[j][k] = Some(false);
         };
 
-        simplified.push(( implicant, intersect ));
+        simplified.push(( implicant, intersect.map(|x| Some(x)).collect::<Vec<_>>() ));
       }
     }
   }
@@ -87,7 +65,7 @@ pub fn simplify(implicants: &Vec<( Implicant, Vec<Option<bool>> )>) -> Vec<( Imp
 }
 
 pub fn construct_func(initial:    &Vec<( Implicant, Vec<Option<bool>> )>, 
-                      simplified: &Vec<( Implicant, Vec<Option<bool>> )>
+                      simplified: Vec<( Implicant, Vec<Option<bool>> )>
   ) -> Vec<LogicalFunction> 
 {
   let mut table: Vec<Vec<Vec<Implicant>>> = Vec::with_capacity(initial[0].1.len());
@@ -101,22 +79,10 @@ pub fn construct_func(initial:    &Vec<( Implicant, Vec<Option<bool>> )>,
     }
   }
 
-  //table[func_index][implicant_index].push(simplified_implicant);
-
   for (initial_id, i) in initial.iter().enumerate() {
-    for j in simplified.iter() {
-      let zipped: Vec<_> = i.0.terms.iter().zip(j.0.terms.iter())
-        .map(|(a, b)| a == b || *b == None )
-        .collect();
-
-      // let covered = i.0.terms.iter()
-      //   .zip(j.0.terms.iter())
-      //   .map(|(&x, &y)| x == y || x == None)
-      //   .all(|x| x);
-
-        // if !covered {
-        //     generated.push(imp);
-        // }
+    for j in &simplified {
+      let mut zipped = i.0.terms.iter().zip(j.0.terms.iter())
+        .map(|(&a, &b)| a == b || b == None );
 
       let intersect = i.1.iter()
         .zip(j.1.iter())
@@ -127,9 +93,9 @@ pub fn construct_func(initial:    &Vec<( Implicant, Vec<Option<bool>> )>,
         })
         .map(|(i, _x)| i);
 
-      if !zipped.contains(&false) { 
+      if zipped.all(|x| x) { 
         for k in intersect {
-          if !table[k][initial_id].contains(&j.0.clone()) {
+          if !table[k][initial_id].contains(&j.0) {
             table[k][initial_id].push(j.0.clone());
           }
         };
@@ -153,14 +119,6 @@ pub fn construct_func(initial:    &Vec<( Implicant, Vec<Option<bool>> )>,
         function.push(item);
       }
     }
-
-    // println!("asdd");
-    // for k in function.iter() {
-    //   println!("{:?}", k);
-    // }
-    // for k in other_simples.iter() {
-    //   println!("{:?}", k);
-    // }
 
     let mut others: Vec<_> = vec![];
     for (impl_id, j) in other_simples {
@@ -194,14 +152,6 @@ pub fn construct_func(initial:    &Vec<( Implicant, Vec<Option<bool>> )>,
     function.append(&mut others);
     functions.push(LogicalFunction { implicants: function });
   };
-
-  // println!("RES:");
-  // for (fn_id, i) in functions.iter().enumerate() {
-  //   println!("{:?}", fn_id);
-  //   for k in i.implicants.iter() {
-  //     println!("{:?}", k);
-  //   }
-  // };
 
   functions
 }
