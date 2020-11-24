@@ -1,7 +1,12 @@
 use std::{env, fs};
+use std::thread;
 use std::fmt::Display;
+
 mod simplified;
+mod generate;
+
 use simplified::*;
+use generate::*;
 
 #[derive(Debug, Clone)]
 pub struct Implicant {
@@ -97,48 +102,21 @@ fn main() {
             .collect()
     };
 
-    let mut generated = vec![];
-    let initial: Vec<_> = implicants.iter().map(|(x, _)| x.clone()).collect();
+    let cloned_implicants: Vec<_> = implicants.iter().map(|(x, _)| x.clone()).collect();
 
-    for i in 0..2u32.pow(implicants[0].0.terms.len() as u32) {
-        let mut sad = format!("{:#032b}", i);
-        sad = String::from(&sad[sad.len() - implicants[0].0.terms.len()..]);
+    let mut generated = generate_implicants(cloned_implicants);
 
-        let terms: Vec<_> = sad.split("")
-            .filter(|x| *x != "").map(|x| match x {
-                "0" => Some(false),
-                "1" => Some(true),
-                _ => unreachable!()
-            }).collect();
+    let mut plug = vec![None].repeat(implicants[0].1.len());
+    
+    implicants.append(&mut generated.iter().map(|x| (x.clone(), plug.clone())).collect::<Vec<_>>());
 
-        let imp = Implicant { terms };
-        let covered = initial.iter()
-            .map(|x| x.terms.iter()
-                .zip(imp.terms.iter())
-                .map(|(&x, &y)| x == y || x == None)
-                .all(|x| x))
-            .any(|x| x);
-
-        if !covered {
-            generated.push(imp);
-        }
-    }
-
-    let mut tmp = implicants[0].1.clone();
-
-    for y in tmp.iter_mut() {
-        *y = None;
-    }
-
-    implicants.append(&mut generated.iter().map(|x| (x.clone(), tmp.clone())).collect::<Vec<_>>());
-
-    let asd = implicants.clone();
-    let it = asd
+    let bind = implicants.clone();
+    let abbreviated = bind
         .iter()
         .enumerate()
         .filter(|(_i, (x, _y))| x.terms.contains(&None));
 
-    it.clone()
+    abbreviated.clone()
         .for_each(|(_i, (x, y))| {
             fn unroll(x: Implicant) -> Vec<Implicant> {
                 match x.terms.iter().position(|x| *x == None) {
@@ -165,11 +143,11 @@ fn main() {
                 .for_each(|x| implicants.push(x));
         });
         
-    let it = it.map(|(i, _)| i).collect::<Vec<_>>();
+    let abbreviated = abbreviated.map(|(i, _)| i).collect::<Vec<_>>();
 
     implicants = implicants.iter()
         .enumerate()
-        .filter(|(i, _x)| !it.contains(i))
+        .filter(|(i, _x)| !abbreviated.contains(i))
         .map(|(_i, x)| x.clone())
         .collect::<Vec<_>>();
 
@@ -179,16 +157,28 @@ fn main() {
     }
     println!("");
 
-    let simplified: Vec<_> = simplify(&implicants);
-    let fns = construct_func(&implicants, simplified);
+    let threads_quantity = implicants[0].1.len();
 
-    for (i, LogicalFunction { implicants }) in fns.iter().enumerate() {
-        let mut func: Vec<String> = vec![];
+    let handle = thread::spawn(move || {
+        for i in 0..threads_quantity {
+            let one_fn: Vec<_> = implicants.clone().iter()
+                .map(|(imp, fns)| (imp.clone(), vec![fns[i]]))
+                .collect();
+            let simplified: Vec<_> = simplify(&one_fn);
+            let fns = construct_func(&one_fn, simplified);
 
-        for implicant in implicants {
-            func.push( format!("({})", implicant) );
+            for (j, LogicalFunction { implicants }) in fns.iter().enumerate() {
+                let mut func: Vec<String> = vec![];
+
+                for implicant in implicants {
+                    func.push( format!("({})", implicant) );
+                }
+
+                println!("y{} = {}", i + j + 1, func.join(" | "));
+            }
         }
+    });
 
-        println!("y{} = {}", i + 1, func.join(" | "));
-    }
+    handle.join().unwrap();
+    
 }

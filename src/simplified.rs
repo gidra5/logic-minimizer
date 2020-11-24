@@ -1,4 +1,3 @@
-// #![feature(non_ascii_idents)]
 pub use crate::*;
 
 pub fn simplify(implicants: &Vec<( Implicant, Vec<Option<bool>> )>) -> Vec<( Implicant, Vec<Option<bool>> )> {
