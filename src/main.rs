@@ -303,10 +303,12 @@ fn main() {
         };
     }
 
-    println!("\nRES:");
+    println!("\nResult:");
     for (index, i) in res.iter().enumerate() {
         let implicants = i.iter().map(|x| Implicant { terms: x.clone(), naming: namings_x.clone() }).collect();
         let function = LogicalFunction { implicants };
-        println!("{} = {}", namings_y.clone()[order.lock().unwrap()[index]], function);
+        println!("{} = {}\n", namings_y.clone()[order.lock().unwrap()[index]], function);
     }
+
+    println!("By Gidra5 & AliusDieMorietur");
 }
