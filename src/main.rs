@@ -159,26 +159,31 @@ fn main() {
 
     let threads_quantity = implicants[0].1.len();
 
-    let handle = thread::spawn(move || {
-        for i in 0..threads_quantity {
-            let one_fn: Vec<_> = implicants.clone().iter()
-                .map(|(imp, fns)| (imp.clone(), vec![fns[i]]))
-                .collect();
-            let simplified: Vec<_> = simplify(&one_fn);
-            let fns = construct_func(&one_fn, simplified);
+    let mut threads = vec![];
+    for i in 0..threads_quantity {
+        let one_fn: Vec<_> = implicants.clone().iter()
+            .map(|(imp, fns)| (imp.clone(), vec![fns[i]]))
+            .collect();
+        threads.push(
+            thread::spawn(move || {
+                let simplified: Vec<_> = simplify(&one_fn);
+                let fns = construct_func(&one_fn, simplified);
 
-            for (j, LogicalFunction { implicants }) in fns.iter().enumerate() {
-                let mut func: Vec<String> = vec![];
+                for (j, LogicalFunction { implicants }) in fns.iter().enumerate() {
+                    let mut func: Vec<String> = vec![];
 
-                for implicant in implicants {
-                    func.push( format!("({})", implicant) );
+                    for implicant in implicants {
+                        func.push( format!("({})", implicant) );
+                    }
+
+                    println!("y{} = {}", i + j + 1, func.join(" | "));
                 }
+            })
+        );
+    }
 
-                println!("y{} = {}", i + j + 1, func.join(" | "));
-            }
-        }
-    });
-
-    handle.join().unwrap();
+    for i in threads {
+        i.join().unwrap();
+    }
     
 }
