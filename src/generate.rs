@@ -13,7 +13,7 @@ pub fn generate_implicants(initial: Vec<Implicant>) -> Vec<Implicant> {
               _ => unreachable!()
           }).collect();
 
-      let imp = Implicant { terms };
+      let imp = Implicant { terms, naming: initial[0].naming.clone() };
       let covered = initial.iter()
           .map(|x| x.terms.iter()
               .zip(imp.terms.iter())

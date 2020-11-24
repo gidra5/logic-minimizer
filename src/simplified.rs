@@ -29,7 +29,7 @@ pub fn simplify(implicants: &Vec<( Implicant, Option<bool> )>) -> Vec<( Implican
         let mut simpler = item_i.0.terms.clone();
         simpler[different_at[0]] = None;
 
-        let implicant = Implicant { terms: simpler };
+        let implicant = Implicant { terms: simpler, naming: implicants[0].0.naming.clone() };
         
         simplified_functions[i] = Some(false);
         simplified_functions[j] = Some(false);

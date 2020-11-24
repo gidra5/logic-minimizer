@@ -12,6 +12,7 @@ use generate::*;
 
 #[derive(Debug, Clone, Hash, Eq)]
 pub struct Implicant {
+    naming: Vec<String>,
     terms: Vec<Option<bool>>,
 }
 
@@ -33,9 +34,9 @@ impl Display for Implicant {
             })
             .map(|(i, x)| {
                 match x {
-                    Some(false) => format!("!x{}", i + 1),
-                    Some(true) => format!(" x{}", i + 1),
-                    None => String::from("")
+                    Some(false) => format!("!{}", self.naming[i]),
+                    Some(true) => format!(" {}", self.naming[i]),
+                    None => unreachable!()
                 }
             })
             .collect::<Vec<_>>()
@@ -81,6 +82,9 @@ impl PartialEq for LogicalFunction {
 }
 
 fn main() {
+    let mut namings_x: Vec<String> = vec![];
+    let mut namings_y: Vec<String> = vec![];
+
     let mut implicants: Vec<_> = {
         let file = match env::args().collect::<Vec<_>>().as_slice() {
             [] | [_] => {
@@ -90,38 +94,44 @@ fn main() {
             [_, filename, ..] => filename.clone()
         };
 
-        fs::read_to_string(&file)
-            .unwrap()
-            .lines()
-            .map(|x| {
-                let (left, right) = match x.split('~').collect::<Vec<_>>().as_slice() {
-                    [] | [_] => panic!("not enough data in row"),
-                    [left, right, ..] => (*left, *right)
-                };
+        let s1 = fs::read_to_string(&file).unwrap();
+        let mut s2 = s1.lines();
 
-                let terms: Vec<_> = left
-                    .split("")
-                    .filter(|x| *x != "")
-                    .map(|x| match x {
-                        "0" => Some(false),
-                        "1" => Some(true),
-                        _ => None,
-                    })
-                    .collect();
+        let s3 = s2.next().unwrap().split('~').map(|x| x.split(' ').map(|x| String::from(x)).collect::<Vec<_>>()).collect::<Vec<_>>();
 
-                let functions: Vec<_> = right
-                    .split("")
-                    .filter(|x| *x != "")
-                    .map(|x| match x {
-                        "0" => Some(false),
-                        "1" => Some(true),
-                        _ => None
-                    })
-                    .collect();
+        namings_x = s3[0].clone();
+        namings_y = s3[1].clone();
+        s2.next();
 
-                (Implicant { terms }, functions)
-            })
-            .collect()
+        s2.map(|x| {
+            let (left, right) = match x.split('~').collect::<Vec<_>>().as_slice() {
+                [] | [_] => panic!("not enough data in row"),
+                [left, right, ..] => (*left, *right)
+            };
+
+            let terms: Vec<_> = left
+                .split("")
+                .filter(|x| *x != "")
+                .map(|x| match x {
+                    "0" => Some(false),
+                    "1" => Some(true),
+                    _ => None,
+                })
+                .collect();
+
+            let functions: Vec<_> = right
+                .split("")
+                .filter(|x| *x != "")
+                .map(|x| match x {
+                    "0" => Some(false),
+                    "1" => Some(true),
+                    _ => None
+                })
+                .collect();
+
+            (Implicant { terms, naming: namings_x.clone() }, functions)
+        })
+        .collect()
     };
 
     let cloned_implicants: Vec<_> = implicants.iter().map(|(x, _)| x.clone()).collect();
@@ -193,6 +203,8 @@ fn main() {
             thread::spawn({
                 let clone_fv = Arc::clone(&function_variants); 
                 let clone_order = Arc::clone(&order); 
+                let namings_y = namings_y.clone();
+
                 move || {
                     let simplified: Vec<_> = simplify(&one_fn);
                     let (core, others) = construct_func(&one_fn, simplified);
@@ -232,7 +244,7 @@ fn main() {
                     println!("{}\n", 
                     shortest_variants.iter()
                         .unique()
-                        .map(|x| format!("y{} = {}", i + 1, x))
+                        .map(|x| format!("{} = {}", namings_y[i], x))
                         .collect::<Vec<_>>()
                         .join(" or\n")
                     );
@@ -241,7 +253,8 @@ fn main() {
                     let mut order = clone_order.lock().unwrap();
                     fv.push(shortest_variants);
                     order.push(i);
-            }})
+                }
+            })
         );
     }
 
@@ -257,12 +270,12 @@ fn main() {
         ).collect::<Vec<_>>()
       );
 
-    println!("\nfvs");
-    for i in fvs.clone() {
-        println!("{:?}", i);
-    }
+    // println!("\nfvs");
+    // for i in fvs.clone() {
+    //     println!("{:?}", i);
+    // }
 
-    let mut implicant_iter = fvs.clone()
+    let implicant_iter = fvs.clone()
         .map(|x| x.into_iter())
         .multi_cartesian_product()
         .peekable();
@@ -279,24 +292,30 @@ fn main() {
         }
     }
 
-    for (index, i) in implicant_iter.clone().enumerate() {
+    for i in implicant_iter {
         let mut counter = 0;
         let mapped = i.iter()
           .map(|x| x[0].clone());
+
+        // println!("{:?}", i);
         for (i_j, j) in mapped.clone().enumerate() {
+            // println!("{:?}", j);
+
             for (i_k, k) in mapped.clone().enumerate() {
                 if i_j == i_k { continue; };
                 if j == k { counter = counter + 1; };
+                // println!("{:?} ... {:?}", j, k);
             }
         }
+
         if counter > global_counter {
             global_counter = counter;
             res = i;
         };
     }
 
-    println!("\nRES:");
-    for i in order.lock().unwrap().iter() {
-        println!("y{}={:?}", i + 1, res[*i]);
-    }
+    // println!("\nRES:");
+    // for i in order.lock().unwrap().iter() {
+    //     println!("y{}={:?}", i + 1, res[*i]);
+    // }
 }
