@@ -104,19 +104,19 @@ fn main() {
 
     let cloned_implicants: Vec<_> = implicants.iter().map(|(x, _)| x.clone()).collect();
 
-    let mut generated = generate_implicants(cloned_implicants);
+    let generated = generate_implicants(cloned_implicants);
 
-    let mut plug = vec![None].repeat(implicants[0].1.len());
+    let plug = vec![None].repeat(implicants[0].1.len());
     
     implicants.append(&mut generated.iter().map(|x| (x.clone(), plug.clone())).collect::<Vec<_>>());
 
     let bind = implicants.clone();
-    let abbreviated = bind
+    let expanded = bind
         .iter()
         .enumerate()
         .filter(|(_i, (x, _y))| x.terms.contains(&None));
 
-    abbreviated.clone()
+    expanded.clone()
         .for_each(|(_i, (x, y))| {
             fn unroll(x: Implicant) -> Vec<Implicant> {
                 match x.terms.iter().position(|x| *x == None) {
@@ -143,11 +143,11 @@ fn main() {
                 .for_each(|x| implicants.push(x));
         });
         
-    let abbreviated = abbreviated.map(|(i, _)| i).collect::<Vec<_>>();
+    let expanded = expanded.map(|(i, _)| i).collect::<Vec<_>>();
 
     implicants = implicants.iter()
         .enumerate()
-        .filter(|(i, _x)| !abbreviated.contains(i))
+        .filter(|(i, _x)| !expanded.contains(i))
         .map(|(_i, x)| x.clone())
         .collect::<Vec<_>>();
 
