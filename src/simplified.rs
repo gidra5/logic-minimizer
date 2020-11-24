@@ -58,7 +58,7 @@ pub fn simplify(implicants: &Vec<( Implicant, Option<bool> )>) -> Vec<( Implican
 pub fn construct_func(
   initial:    &Vec<( Implicant, Option<bool> )>, 
   simplified:  Vec<( Implicant, Option<bool> )>
-) -> LogicalFunction {
+) -> (Vec<Implicant>, Vec<Vec<Implicant>>) {
   let mut table: Vec<Vec<Implicant>> = Vec::with_capacity(initial.len());
   table.resize(initial.len(), vec![]);
 
@@ -71,6 +71,7 @@ pub fn construct_func(
         (Some(true), Some(true)) => true,
         _ => false
       };
+      
       if 
         zipped.all(|x| x) &&
         !table[initial_id].contains(&j.0) &&
@@ -83,11 +84,11 @@ pub fn construct_func(
 
   let mut function = vec![];
   let (unsorted_core, other_simples): (Vec<_>, Vec<_>) = table
-    .iter()
+    .into_iter()
     .enumerate()
-    .partition(|&(_i, j)| j.len() == 1); 
+    .partition(|(_i, j)| j.len() == 1); 
     
-  for item in unsorted_core.iter()
+  for item in unsorted_core.into_iter()
     .map(|(_i, x)| x[0].clone()) 
   {
     if !function.contains(&item) {
@@ -95,17 +96,17 @@ pub fn construct_func(
     }
   }
 
-  let mut others: Vec<_> = vec![];
+  let mut others: Vec<Vec<_>> = vec![];
   for (impl_id, j) in other_simples {
     if initial[impl_id].1 == None {
       continue;
     }
 
-    let mut shortest = None;
+    let mut shortest = vec![];
     let mut count = 0;
 
     for k in j {
-      if function.contains(k) { shortest = None; break; };
+      if function.contains(&k) { shortest = vec![]; break; };
 
       let quantity = k.terms
         .iter()
@@ -113,18 +114,19 @@ pub fn construct_func(
         .collect::<Vec<_>>()
         .len();
 
-      if quantity > count { count = quantity; shortest = Some(k.clone()); };
-    }
-
-    if shortest != None {
-      let tmp = shortest.unwrap();
-      if !others.contains(&tmp) {
-        others.push(tmp);
+      if quantity > count { count = quantity; shortest = vec![k]; } 
+      else if quantity == count {
+        shortest.push(k);
       }
     }
+
+    if shortest.len() != 0 && !others.contains(&shortest) {
+      others.push(shortest);
+    }
   }
+  // let mut others = others.iter().map(|x| x[0].clone()).unique().collect::<Vec<_>>();
 
-  function.append(&mut others);
-  LogicalFunction { implicants: function }
-
+  // function.append(&mut others);
+  // LogicalFunction { implicants: function }
+  (function, others)
 }

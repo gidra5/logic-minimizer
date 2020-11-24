@@ -1,6 +1,7 @@
 use std::{env, fs};
 use std::thread;
 use std::fmt::Display;
+use itertools::Itertools;
 
 mod simplified;
 mod generate;
@@ -8,7 +9,7 @@ mod generate;
 use simplified::*;
 use generate::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq)]
 pub struct Implicant {
     terms: Vec<Option<bool>>,
 }
@@ -47,9 +48,29 @@ impl Display for Implicant {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq)]
 pub struct LogicalFunction {
     implicants: Vec<Implicant>,
+}
+
+impl Display for LogicalFunction {
+    fn fmt(&self, format: &mut std::fmt::Formatter) -> std::result::Result<(), std::fmt::Error> {
+        let mut func: Vec<String> = vec![];
+
+        if self.implicants.len() == 0 {
+            func.push( String::from("0"));
+        } 
+        else if self.implicants.len() == 1 {
+            func.push( format!("{}", self.implicants[0]) );
+        } 
+        else {
+            for implicant in self.implicants.iter() {
+                func.push( format!("({})", implicant) );
+            }
+        }
+
+        write!(format, "{}", func.join(" | "))
+    }
 }
 
 impl PartialEq for LogicalFunction {
@@ -124,7 +145,7 @@ fn main() {
                         let mut t1 = x.clone();
                         t1.terms[i] = Some(false);
 
-                        let mut t2 = x.clone();
+                        let mut t2 = x;
                         t2.terms[i] = Some(true);
 
                         let mut t3 = vec![];
@@ -138,24 +159,24 @@ fn main() {
             };
 
             unroll(x.clone())
-                .iter()
-                .map(|x| (x.clone(), y.clone()))
+                .into_iter()
+                .map(|x| (x, y.clone()))
                 .for_each(|x| implicants.push(x));
         });
         
     let expanded = expanded.map(|(i, _)| i).collect::<Vec<_>>();
 
-    implicants = implicants.iter()
+    implicants = implicants.into_iter()
         .enumerate()
         .filter(|(i, _x)| !expanded.contains(i))
-        .map(|(_i, x)| x.clone())
+        .map(|(_i, x)| x)
         .collect::<Vec<_>>();
 
-    println!("Initial:");
-    for (i, (imp, fns)) in implicants.iter().enumerate() {
-        println!("{}, ({{ {} }}, {:?})", i + 1, imp, fns);
-    }
-    println!("");
+    // println!("Initial:");
+    // for (i, (imp, fns)) in implicants.iter().enumerate() {
+    //     println!("{}, ({{ {} }}, {:?})", i + 1, imp, fns);
+    // }
+    // println!("");
 
     let threads_quantity = implicants[0].1.len();
 
@@ -164,17 +185,50 @@ fn main() {
         let one_fn: Vec<_> = implicants.clone().iter()
             .map(|(imp, fns)| (imp.clone(), fns[i]))
             .collect();
+            
         threads.push(
             thread::spawn(move || {
                 let simplified: Vec<_> = simplify(&one_fn);
-                let LogicalFunction { implicants } = construct_func(&one_fn, simplified);
+                let (core, others) = construct_func(&one_fn, simplified);
 
-                let mut func: Vec<String> = vec![];
-                for implicant in implicants {
-                    func.push( format!("({})", implicant) );
-                }
+                let mut variants = vec![];
+                let mut it = others.into_iter()
+                    .map(|x| x.into_iter())
+                    .multi_cartesian_product()
+                    .peekable();
                 
-                println!("y{} = {}", i + 1, func.join(" | "));
+                match it.peek() {
+                    Some(_) => (),
+                    None => variants.push( LogicalFunction { implicants: core.clone() })
+                }
+
+                for combination in it {
+                    let mut implicants = core.clone();
+                    implicants.append(&mut combination.into_iter()
+                        .unique()
+                        .collect::<Vec<_>>());
+                    
+                    variants.push(LogicalFunction { implicants });
+                }
+
+                let count = variants[0].implicants.len();
+                let mut shortest_variants = vec![];
+
+                for variant in variants {
+                    if variant.implicants.len() < count {
+                        shortest_variants = vec![variant];
+                    } else if variant.implicants.len() == count {
+                        shortest_variants.push(variant);
+                    } 
+                }
+
+                println!("{}\n", 
+                shortest_variants.iter()
+                    .unique()
+                    .map(|x| format!("y{} = {}", i + 1, x))
+                    .collect::<Vec<_>>()
+                    .join(" or\n")
+                );
             })
         );
     }
