@@ -162,22 +162,19 @@ fn main() {
     let mut threads = vec![];
     for i in 0..threads_quantity {
         let one_fn: Vec<_> = implicants.clone().iter()
-            .map(|(imp, fns)| (imp.clone(), vec![fns[i]]))
+            .map(|(imp, fns)| (imp.clone(), fns[i]))
             .collect();
         threads.push(
             thread::spawn(move || {
                 let simplified: Vec<_> = simplify(&one_fn);
-                let fns = construct_func(&one_fn, simplified);
+                let LogicalFunction { implicants } = construct_func(&one_fn, simplified);
 
-                for (j, LogicalFunction { implicants }) in fns.iter().enumerate() {
-                    let mut func: Vec<String> = vec![];
-
-                    for implicant in implicants {
-                        func.push( format!("({})", implicant) );
-                    }
-
-                    println!("y{} = {}", i + j + 1, func.join(" | "));
+                let mut func: Vec<String> = vec![];
+                for implicant in implicants {
+                    func.push( format!("({})", implicant) );
                 }
+                
+                println!("y{} = {}", i + 1, func.join(" | "));
             })
         );
     }

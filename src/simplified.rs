@@ -1,11 +1,11 @@
 pub use crate::*;
 
-pub fn simplify(implicants: &Vec<( Implicant, Vec<Option<bool>> )>) -> Vec<( Implicant, Vec<Option<bool>> )> {
+pub fn simplify(implicants: &Vec<( Implicant, Option<bool> )>) -> Vec<( Implicant, Option<bool> )> {
   let mut simplified_functions: Vec<_> = implicants.iter()
       .map(|(_, vec)| vec.clone())
       .collect();
 
-  let mut simplified: Vec<( Implicant, Vec<Option<bool>> )> = vec![];
+  let mut simplified: Vec<( Implicant, Option<bool> )> = vec![];
 
   for i in 0..implicants.len() {
     let item_i = &implicants[i];
@@ -13,12 +13,10 @@ pub fn simplify(implicants: &Vec<( Implicant, Vec<Option<bool>> )>) -> Vec<( Imp
     for j in i + 1..implicants.len() {
       let item_j = &implicants[j];
 
-      let intersect = item_i.1.iter()
-        .zip(item_j.1.iter())
-        .map(|x| match x {
-          (_, Some(false)) | (Some(false), _) => false,
-          _ => true
-        });
+      let intersect = match (item_i.1, item_j.1) {
+        (_, Some(false)) | (Some(false), _) => false,
+         _ => true
+      };
 
       let different_at: Vec<usize> = item_i.0.terms.iter()
         .zip(item_j.0.terms.iter())
@@ -27,23 +25,16 @@ pub fn simplify(implicants: &Vec<( Implicant, Vec<Option<bool>> )>) -> Vec<( Imp
         .map(|(i, _)| i)
         .collect();
       
-      if different_at.len() == 1 && intersect.clone().any(|x| x) {
+      if different_at.len() == 1 && intersect {
         let mut simpler = item_i.0.terms.clone();
         simpler[different_at[0]] = None;
 
         let implicant = Implicant { terms: simpler };
         
-        let transformed = intersect.clone()
-          .enumerate()
-          .filter(|(_i, x)| *x)
-          .map(|(i, _x)| i);
+        simplified_functions[i] = Some(false);
+        simplified_functions[j] = Some(false);
 
-        for k in transformed {
-          simplified_functions[i][k] = Some(false);
-          simplified_functions[j][k] = Some(false);
-        };
-
-        simplified.push(( implicant, intersect.map(|x| Some(x)).collect::<Vec<_>>() ));
+        simplified.push(( implicant, Some(true)));
       }
     }
   }
@@ -55,7 +46,7 @@ pub fn simplify(implicants: &Vec<( Implicant, Vec<Option<bool>> )>) -> Vec<( Imp
   #[allow(unused_mut)]
   let mut tmp: Vec<_> = implicants.into_iter()
     .enumerate()
-    .filter(|&(i, _)| simplified_functions[i].contains(&Some(true)))
+    .filter(|&(i, _)| simplified_functions[i]== Some(true))
     .map(|(i, (x, _))| (x.clone(), simplified_functions[i].clone()))
     .collect();
 
@@ -63,94 +54,76 @@ pub fn simplify(implicants: &Vec<( Implicant, Vec<Option<bool>> )>) -> Vec<( Imp
   tmp
 }
 
-pub fn construct_func(initial:    &Vec<( Implicant, Vec<Option<bool>> )>, 
-                      simplified: Vec<( Implicant, Vec<Option<bool>> )>
-  ) -> Vec<LogicalFunction> 
-{
-  let mut table: Vec<Vec<Vec<Implicant>>> = Vec::with_capacity(initial[0].1.len());
-  table.resize(initial[0].1.len(), vec![]);
-
-  for i in table.iter_mut() {
-    *i = Vec::with_capacity(initial.len());
-    i.resize(initial.len(), vec![]);
-    for j in i.iter_mut() {
-      *j = vec![];
-    }
-  }
+pub fn construct_func(
+  initial:    &Vec<( Implicant, Option<bool> )>, 
+  simplified:  Vec<( Implicant, Option<bool> )>
+) -> LogicalFunction {
+  let mut table: Vec<Vec<Implicant>> = Vec::with_capacity(initial.len());
+  table.resize(initial.len(), vec![]);
 
   for (initial_id, i) in initial.iter().enumerate() {
     for j in &simplified {
       let mut zipped = i.0.terms.iter().zip(j.0.terms.iter())
         .map(|(&a, &b)| a == b || b == None );
 
-      let intersect = i.1.iter()
-        .zip(j.1.iter())
-        .enumerate()
-        .filter(|(_i, x)| match x {
-            (Some(true), Some(true)) => true,
-            _ => false
-        })
-        .map(|(i, _x)| i);
-
-      if zipped.all(|x| x) { 
-        for k in intersect {
-          if !table[k][initial_id].contains(&j.0) {
-            table[k][initial_id].push(j.0.clone());
-          }
-        };
+      let intersect = match (i.1, j.1) {
+        (Some(true), Some(true)) => true,
+        _ => false
       };
+      if 
+        zipped.all(|x| x) &&
+        !table[initial_id].contains(&j.0) &&
+        intersect 
+      {
+        table[initial_id].push(j.0.clone());
+      }
     };
   };
 
-  let mut functions = vec![]; 
+  let mut function = vec![];
+  let (unsorted_core, other_simples): (Vec<_>, Vec<_>) = table
+    .iter()
+    .enumerate()
+    .partition(|&(_i, j)| j.len() == 1); 
+    
+  for item in unsorted_core.iter()
+    .map(|(_i, x)| x[0].clone()) 
+  {
+    if !function.contains(&item) {
+      function.push(item);
+    }
+  }
 
-  for (fn_id, i) in table.iter().enumerate() {
-    let mut function = vec![];
-    let (unsorted_core, other_simples): (Vec<_>, Vec<_>) = i
-      .iter()
-      .enumerate()
-      .partition(|&(_i, j)| j.len() == 1); 
-      
-    for item in unsorted_core.iter()
-      .map(|(_i, x)| x[0].clone()) 
-    {
-      if !function.contains(&item) {
-        function.push(item);
-      }
+  let mut others: Vec<_> = vec![];
+  for (impl_id, j) in other_simples {
+    if initial[impl_id].1 == None {
+      continue;
     }
 
-    let mut others: Vec<_> = vec![];
-    for (impl_id, j) in other_simples {
-      if initial[impl_id].1[fn_id] == None {
-        continue;
-      }
+    let mut shortest = None;
+    let mut count = 0;
 
-      let mut shortest = None;
-      let mut count = 0;
+    for k in j {
+      if function.contains(k) { shortest = None; break; };
 
-      for k in j {
-        if function.contains(k) { shortest = None; break; };
+      let quantity = k.terms
+        .iter()
+        .filter(|&&x| x == None)
+        .collect::<Vec<_>>()
+        .len();
 
-        let quantity = k.terms
-          .iter()
-          .filter(|&&x| x == None)
-          .collect::<Vec<_>>()
-          .len();
-
-        if quantity > count { count = quantity; shortest = Some(k.clone()); };
-      }
-
-      if shortest != None {
-        let tmp = shortest.unwrap();
-        if !others.contains(&tmp) {
-          others.push(tmp);
-        }
-      }
+      if quantity > count { count = quantity; shortest = Some(k.clone()); };
     }
 
-    function.append(&mut others);
-    functions.push(LogicalFunction { implicants: function });
-  };
+    if shortest != None {
+      let tmp = shortest.unwrap();
+      if !others.contains(&tmp) {
+        others.push(tmp);
+      }
+    }
+  }
 
-  functions
+  function.append(&mut others);
+  LogicalFunction { implicants: function }
+
 }
