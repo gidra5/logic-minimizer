@@ -270,13 +270,8 @@ fn main() {
         ).collect::<Vec<_>>()
       );
 
-    // println!("\nfvs");
-    // for i in fvs.clone() {
-    //     println!("{:?}", i);
-    // }
-
     let implicant_iter = fvs.clone()
-        .map(|x| x.into_iter())
+        .map(| x| x.into_iter())
         .multi_cartesian_product()
         .peekable();
 
@@ -294,17 +289,11 @@ fn main() {
 
     for i in implicant_iter {
         let mut counter = 0;
-        let mapped = i.iter()
-          .map(|x| x[0].clone());
+        for (i_j, j) in i.clone().iter().enumerate() {
 
-        // println!("{:?}", i);
-        for (i_j, j) in mapped.clone().enumerate() {
-            // println!("{:?}", j);
-
-            for (i_k, k) in mapped.clone().enumerate() {
+            for (i_k, k) in i.clone().iter().enumerate() {
                 if i_j == i_k { continue; };
                 if j == k { counter = counter + 1; };
-                // println!("{:?} ... {:?}", j, k);
             }
         }
 
@@ -314,8 +303,10 @@ fn main() {
         };
     }
 
-    // println!("\nRES:");
-    // for i in order.lock().unwrap().iter() {
-    //     println!("y{}={:?}", i + 1, res[*i]);
-    // }
+    println!("\nRES:");
+    for (index, i) in res.iter().enumerate() {
+        let implicants = i.iter().map(|x| Implicant { terms: x.clone(), naming: namings_x.clone() }).collect();
+        let function = LogicalFunction { implicants };
+        println!("{} = {}", namings_y.clone()[order.lock().unwrap()[index]], function);
+    }
 }
