@@ -40,6 +40,7 @@ pub fn simplify(implicants: &Vec<( Implicant, Option<bool> )>) -> Vec<( Implican
   }
 
   if simplified.len() > 0 {
+    simplified.dedup();
     simplified = simplify(&simplified);
   }
 
