@@ -180,6 +180,7 @@ fn main() {
     // println!("");
 
     let function_variants = Arc::new(Mutex::new(vec![]));
+    let order = Arc::new(Mutex::new(vec![]));
 
     let threads_quantity = implicants[0].1.len();
     let mut threads = vec![];
@@ -189,52 +190,57 @@ fn main() {
             .collect();
             
         threads.push(
-            thread::spawn({let clone = Arc::clone(&function_variants); move || {
-                let simplified: Vec<_> = simplify(&one_fn);
-                let (core, others) = construct_func(&one_fn, simplified);
+            thread::spawn({
+                let clone_fv = Arc::clone(&function_variants); 
+                let clone_order = Arc::clone(&order); 
+                move || {
+                    let simplified: Vec<_> = simplify(&one_fn);
+                    let (core, others) = construct_func(&one_fn, simplified);
 
-                let mut impicant_variants = vec![];
-                let mut implicant_iter = others.into_iter()
-                    .map(|x| x.into_iter())
-                    .multi_cartesian_product()
-                    .peekable();
-                
-                match implicant_iter.peek() {
-                    Some(_) => (),
-                    None => impicant_variants.push( LogicalFunction { implicants: core.clone() })
-                }
-
-                for combination in implicant_iter {
-                    let mut implicants = core.clone();
-                    implicants.append(&mut combination.into_iter()
-                        .unique()
-                        .collect::<Vec<_>>());
+                    let mut impicant_variants = vec![];
+                    let mut implicant_iter = others.into_iter()
+                        .map(|x| x.into_iter())
+                        .multi_cartesian_product()
+                        .peekable();
                     
-                    impicant_variants.push(LogicalFunction { implicants });
-                }
+                    match implicant_iter.peek() {
+                        Some(_) => (),
+                        None => impicant_variants.push( LogicalFunction { implicants: core.clone() })
+                    }
+
+                    for combination in implicant_iter {
+                        let mut implicants = core.clone();
+                        implicants.append(&mut combination.into_iter()
+                            .unique()
+                            .collect::<Vec<_>>());
+                        
+                        impicant_variants.push(LogicalFunction { implicants });
+                    }
 
 
-                let count = impicant_variants[0].implicants.len();
-                let mut shortest_variants = vec![];
+                    let count = impicant_variants[0].implicants.len();
+                    let mut shortest_variants = vec![];
 
-                for variant in impicant_variants {
-                    if variant.implicants.len() < count {
-                        shortest_variants = vec![variant];
-                    } else if variant.implicants.len() == count {
-                        shortest_variants.push(variant);
-                    } 
-                }
+                    for variant in impicant_variants {
+                        if variant.implicants.len() < count {
+                            shortest_variants = vec![variant];
+                        } else if variant.implicants.len() == count {
+                            shortest_variants.push(variant);
+                        } 
+                    }
 
-                println!("{}\n", 
-                shortest_variants.iter()
-                    .unique()
-                    .map(|x| format!("y{} = {}", i + 1, x))
-                    .collect::<Vec<_>>()
-                    .join(" or\n")
-                );
+                    println!("{}\n", 
+                    shortest_variants.iter()
+                        .unique()
+                        .map(|x| format!("y{} = {}", i + 1, x))
+                        .collect::<Vec<_>>()
+                        .join(" or\n")
+                    );
 
-                let mut v = clone.lock().unwrap();
-                v.push((i, shortest_variants));
+                    let mut fv = clone_fv.lock().unwrap();
+                    let mut order = clone_order.lock().unwrap();
+                    fv.push(shortest_variants);
+                    order.push(i);
             }})
         );
     }
@@ -244,29 +250,20 @@ fn main() {
     }
 
     let bind = function_variants.lock().unwrap();
-    let with_numbers = bind.iter()
-      .map(|(i, x)| (i, x.iter()
+    let fvs = bind.iter()
+      .map(|x| x.iter()
         .map(|y| y.implicants.iter()
             .map(|z| z.clone().terms).collect::<Vec<_>>()
-        ).collect::<Vec<_>>())
+        ).collect::<Vec<_>>()
       );
-    let without_numbers: Vec<_> = with_numbers.clone()
-      .map(|(_i, x)| x).collect(); 
 
-    println!("\nWITH NUMBERS");
-    for i in with_numbers.clone() {
+    println!("\nfvs");
+    for i in fvs.clone() {
         println!("{:?}", i);
     }
 
-    println!("\nWITHOUT NUMBERS");
-    for i in without_numbers.clone() {
-        println!("{:?}", i);
-    }
-
-    let order: Vec<_> = with_numbers.clone().map(|(i, x)| i).collect();
-
-    let mut implicant_iter = with_numbers.clone()
-        .map(|(_, x)| x.into_iter())
+    let mut implicant_iter = fvs.clone()
+        .map(|x| x.into_iter())
         .multi_cartesian_product()
         .peekable();
 
@@ -299,7 +296,7 @@ fn main() {
     }
 
     println!("\nRES:");
-    for i in order {
-        println!("y{}={:?}", i, res[*i]);
+    for i in order.lock().unwrap().iter() {
+        println!("y{}={:?}", i + 1, res[*i]);
     }
 }
