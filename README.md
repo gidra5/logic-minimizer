@@ -4,7 +4,7 @@ to (not) die from ac
 Requirements
 * Rust
 
-#Usage
+# Usage
 1. Install rust
 2. Clone this repo
 3. Create your txt file with your table and labels and put in directory or "example" folder
