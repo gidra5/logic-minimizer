@@ -9,6 +9,8 @@ to (not) die from ac
 2. Clone this repo with `git clone https://github.com/gidra5/logic-minimizer.git`
 3. Create your txt file with your table and labels according to the rules below and put in directory or "example" folder
 4. Run `cargo run <your txt file name>`
+
+or [download latest binary](https://github.com/gidra5/logic-minimizer/releases) and run it from cmd with txt as input
   
 # Formatting  
 Txt file for your table should follow some rules, so that program didn't fail or generate incorrect results.
